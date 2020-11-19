@@ -27,6 +27,23 @@ type product struct {
 	Price    int    `json:"price"`
 }
 
+type payload struct {
+	Products []productPayload `json:"products"`
+}
+type productPayload struct {
+	Sku      string              `json:"sku"`
+	Name     string              `json:"name"`
+	Category string              `json:"category"`
+	Price    productPricePayload `json:"price"`
+}
+
+type productPricePayload struct {
+	Original           int     `json:"original"`
+	Final              int     `json:"final"`
+	DiscountPercentage *string `json:"discount"`
+	Currency           string  `json:"currency"`
+}
+
 var productsTableContent = products{
 	Products: []product{
 		{
@@ -83,9 +100,13 @@ func main() {
 }
 
 func (s *service) handler(w http.ResponseWriter, r *http.Request) {
-	products := queryDB(s.db)
+	dbContent := queryDB(s.db)
 
-	json.NewEncoder(w).Encode(map[string]interface{}{"products": products})
+	finalPayload := formatResponse(dbContent)
+
+	json.NewEncoder(w).Encode(payload{
+		Products: finalPayload,
+	})
 }
 
 func dbNotExists(filename string) bool {
@@ -156,10 +177,10 @@ func createProductTable(db *sql.DB) {
 	tx.Commit()
 }
 
-func queryDB(db *sql.DB) []map[string]interface{} {
-	var products []map[string]interface{}
+func queryDB(db *sql.DB) []product {
+	var products []product
 
-	rows, err := db.Query("select sku, name, category, price as original from products")
+	rows, err := db.Query("select sku, name, category, price from products")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -167,20 +188,60 @@ func queryDB(db *sql.DB) []map[string]interface{} {
 
 	var (
 		sku, name, category string
-		original            int
+		price               int
 	)
 	for rows.Next() {
-		rows.Scan(&sku, &name, &category, &original)
-		fmt.Println(strings.Join([]string{sku, name, category, fmt.Sprint(original)}, ","))
+		rows.Scan(&sku, &name, &category, &price)
+		fmt.Println(strings.Join([]string{sku, name, category, fmt.Sprint(price)}, ","))
 
-		product := map[string]interface{}{
-			"sku":      sku,
-			"name":     name,
-			"category": category,
-			"original": original,
+		product := product{
+			Sku:      sku,
+			Name:     name,
+			Category: category,
+			Price:    price,
 		}
 		products = append(products, product)
 	}
 
 	return products
+}
+
+func formatResponse(ps []product) []productPayload {
+	var result = make([]productPayload, len(ps))
+	for i := 0; i < len(ps); i++ {
+		p := ps[i]
+		finalPrice, discount := calculateFinalPriceAndDiscount(p)
+
+		result[i] = productPayload{
+			Sku:      p.Sku,
+			Name:     p.Name,
+			Category: p.Category,
+			Price: productPricePayload{
+				Original:           p.Price,
+				Currency:           "EUR",
+				Final:              finalPrice,
+				DiscountPercentage: discount,
+			},
+		}
+
+		fmt.Println("formated payload", result[i], discount, "end")
+	}
+
+	return result
+}
+
+func calculateFinalPriceAndDiscount(p product) (int, *string) {
+	var discount string
+
+	if p.Sku == "000003" {
+		discount = "15%"
+		return int(float64(p.Price) * 0.7), &discount
+	}
+
+	if p.Category == "boots" {
+		discount = "30%"
+		return int(float64(p.Price) * 0.7), &discount
+	}
+
+	return p.Price, nil
 }
