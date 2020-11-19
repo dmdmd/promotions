@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -16,6 +15,51 @@ import (
 
 type service struct {
 	db *sql.DB
+}
+
+type products struct {
+	Products []product `json:"products"`
+}
+type product struct {
+	Sku      string `json:"sku"`
+	Name     string `json:"name"`
+	Category string `json:"category"`
+	Price    int    `json:"price"`
+}
+
+var productsTableContent = products{
+	Products: []product{
+		{
+			Sku:      "000001",
+			Name:     "BV Lean leather ankle boots",
+			Category: "boots",
+			Price:    89000,
+		},
+		{
+			Sku:      "000002",
+			Name:     "BV Lean leather ankle boots",
+			Category: "boots",
+			Price:    99000,
+		},
+		{
+			Sku:      "000003",
+			Name:     "Ashlington leather ankle boots",
+			Category: "boots",
+			Price:    71000,
+		},
+		{
+			Sku:      "000004",
+			Name:     "Naima embellished suede sandals",
+			Category: "sandals",
+			Price:    79500,
+		},
+		{
+			Sku:      "000005",
+			Name:     "Nathane leather sneakers",
+			Category: "sneakers",
+			Price:    59000,
+		},
+	},
 }
 
 func main() {
@@ -69,20 +113,24 @@ func createDB(filename string) *sql.DB {
 	}
 	// defer db.Close()
 
+	createProductTable(db)
+
+	return db
+}
+
+func createProductTable(db *sql.DB) {
 	sqlStmt := `
 	CREATE TABLE products (
-		id INTEGER NOT NULL PRIMARY KEY,
-		sku TEXT,
+		sku TEXT NOT NULL PRIMARY KEY,
 		name TEXT,
 		category TEXT,
 		price INTEGER
 	);
 	DELETE FROM products;
 	`
-	_, err = db.Exec(sqlStmt)
+	_, err := db.Exec(sqlStmt)
 	if err != nil {
 		log.Printf("%q: %s\n", err, sqlStmt)
-		return db
 	}
 
 	tx, err := db.Begin()
@@ -90,45 +138,39 @@ func createDB(filename string) *sql.DB {
 		log.Fatal(err)
 	}
 
-	stmt, err := tx.Prepare("insert into products(id, sku, name, category, price) values(?, ?, ?, ?, ?)")
+	stmt, err := tx.Prepare("insert into products(sku, name, category, price) values(?, ?, ?, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer stmt.Close()
 
-	categories := []string{
-		"boots",
-		"sandals",
-		"sneakers",
-	}
+	for i := 0; i < len(productsTableContent.Products); i++ {
+		p := productsTableContent.Products[i]
 
-	for i := 0; i < 9; i++ {
-		cat := categories[i%3]
-		_, err = stmt.Exec(i, "00000"+fmt.Sprint(i), "leather "+cat, cat, rand.Intn(100)*100)
+		fmt.Println("inserting product", p)
+		_, err = stmt.Exec(p.Sku, p.Name, p.Category, p.Price)
 		if err != nil {
 			log.Fatal(err)
 		}
 	}
 	tx.Commit()
-
-	return db
 }
 
 func queryDB(db *sql.DB) []map[string]interface{} {
 	var products []map[string]interface{}
 
-	rows, err := db.Query("select id, sku, name, category, price as original from products")
+	rows, err := db.Query("select sku, name, category, price as original from products")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer rows.Close()
 
 	var (
-		id, sku, name, category string
-		original                int
+		sku, name, category string
+		original            int
 	)
 	for rows.Next() {
-		rows.Scan(&id, &sku, &name, &category, &original)
+		rows.Scan(&sku, &name, &category, &original)
 		fmt.Println(strings.Join([]string{sku, name, category, fmt.Sprint(original)}, ","))
 
 		product := map[string]interface{}{
