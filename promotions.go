@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -18,7 +19,7 @@ type service struct {
 }
 
 func main() {
-	const dbPath = "./foo.db"
+	const dbPath = "./database.db"
 	var deleteDB *bool = flag.Bool("r", false, "Recreate")
 	flag.Parse()
 
@@ -32,15 +33,15 @@ func main() {
 		db: database,
 	}
 
-	queryDB(database)
-
 	http.Handle("/products", http.HandlerFunc(s.handler))
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func (s *service) handler(w http.ResponseWriter, r *http.Request) {
+	products := queryDB(s.db)
 
+	json.NewEncoder(w).Encode(map[string]interface{}{"products": products})
 }
 
 func dbNotExists(filename string) bool {
@@ -50,9 +51,9 @@ func dbNotExists(filename string) bool {
 
 func getDB(filename string) *sql.DB {
 	if dbNotExists(filename) {
-		return createDB()
+		return createDB(filename)
 	}
-	db, err := sql.Open("sqlite3", "./foo.db")
+	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,8 +62,8 @@ func getDB(filename string) *sql.DB {
 	return db
 }
 
-func createDB() *sql.DB {
-	db, err := sql.Open("sqlite3", "./foo.db")
+func createDB(filename string) *sql.DB {
+	db, err := sql.Open("sqlite3", filename)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -113,7 +114,9 @@ func createDB() *sql.DB {
 	return db
 }
 
-func queryDB(db *sql.DB) {
+func queryDB(db *sql.DB) []map[string]interface{} {
+	var products []map[string]interface{}
+
 	rows, err := db.Query("select id, sku, name, category, price as original from products")
 	if err != nil {
 		log.Fatal(err)
@@ -127,5 +130,15 @@ func queryDB(db *sql.DB) {
 	for rows.Next() {
 		rows.Scan(&id, &sku, &name, &category, &original)
 		fmt.Println(strings.Join([]string{sku, name, category, fmt.Sprint(original)}, ","))
+
+		product := map[string]interface{}{
+			"sku":      sku,
+			"name":     name,
+			"category": category,
+			"original": original,
+		}
+		products = append(products, product)
 	}
+
+	return products
 }
