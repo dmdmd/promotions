@@ -94,13 +94,21 @@ func main() {
 		db: database,
 	}
 
-	http.Handle("/products", http.HandlerFunc(s.handler))
+	http.HandleFunc("/products", s.handler)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func (s *service) handler(w http.ResponseWriter, r *http.Request) {
-	dbContent := queryDB(s.db)
+	var filterByCategory, filterByPriceLessThan string
+	if len(r.URL.Query()["category"]) > 0 {
+		filterByCategory = r.URL.Query()["category"][0]
+	}
+	if len(r.URL.Query()["priceLessThan"]) > 0 {
+		filterByPriceLessThan = r.URL.Query()["priceLessThan"][0]
+	}
+
+	dbContent := queryDB(s.db, filterByCategory, filterByPriceLessThan)
 
 	finalPayload := formatResponse(dbContent)
 
@@ -159,7 +167,7 @@ func createProductTable(db *sql.DB) {
 		log.Fatal(err)
 	}
 
-	stmt, err := tx.Prepare("insert into products(sku, name, category, price) values(?, ?, ?, ?)")
+	stmt, err := tx.Prepare("INSERT INTO products(sku, name, category, price) VALUES(?, ?, ?, ?)")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -177,10 +185,23 @@ func createProductTable(db *sql.DB) {
 	tx.Commit()
 }
 
-func queryDB(db *sql.DB) []product {
+func queryDB(db *sql.DB, filterByCategory string, filterByPriceLessThan string) []product {
 	var products []product
+	var queryString = "SELECT sku, name, category, price FROM products"
 
-	rows, err := db.Query("select sku, name, category, price from products")
+	if len(filterByCategory) > 0 {
+		queryString += fmt.Sprintf(" WHERE category = \"%v\"", filterByCategory)
+	}
+
+	if len(filterByPriceLessThan) > 0 && len(filterByCategory) > 0 {
+		queryString += " AND price < " + filterByPriceLessThan
+	} else if len(filterByPriceLessThan) > 0 {
+		queryString += " WHERE price <= " + filterByPriceLessThan
+	}
+
+	fmt.Println(queryString)
+
+	rows, err := db.Query(queryString)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -224,7 +245,7 @@ func formatResponse(ps []product) []productPayload {
 			},
 		}
 
-		fmt.Println("formated payload", result[i], discount, "end")
+		fmt.Println("formated payload", result[i], "end")
 	}
 
 	return result
