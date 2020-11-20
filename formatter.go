@@ -57,7 +57,7 @@ func (s *payloadFormatter) getPriceAndDiscount(p product) (int, *string) {
 
 	if p.Sku == "000003" {
 		discount = "15%"
-		return int(float64(p.Price) * 0.7), &discount
+		return int(float64(p.Price) * 0.85), &discount
 	}
 
 	if p.Category == "boots" {
