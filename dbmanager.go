@@ -147,8 +147,7 @@ func (s *sqliteManager) queryDB(filterByCategory string, filterByPriceLessThan s
 	)
 
 	s.openDB()
-
-	defer s.db.Close()
+	defer s.close()
 
 	if len(filterByCategory) > 0 {
 		queryString += fmt.Sprintf(" WHERE category = \"%v\"", filterByCategory)
@@ -163,7 +162,6 @@ func (s *sqliteManager) queryDB(filterByCategory string, filterByPriceLessThan s
 	log.Println(queryString)
 
 	rows, err := s.db.Query(queryString)
-
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -183,4 +181,8 @@ func (s *sqliteManager) queryDB(filterByCategory string, filterByPriceLessThan s
 	}
 
 	return products
+}
+
+func (s *sqliteManager) close() error {
+	return s.db.Close()
 }
