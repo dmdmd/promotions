@@ -4,11 +4,30 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 )
 
 type service struct {
 	db         dbManager
 	payloadFmt formatter
+}
+
+func newService(recreateDB bool, dbPath string) *service {
+	var myDBManager = sqliteManager{
+		dbPath: dbPath,
+	}
+
+	var myPayloadFormatter = payloadFormatter{}
+
+	if recreateDB {
+		os.Remove(dbPath)
+		myDBManager.createDB()
+	}
+
+	return &service{
+		db:         &myDBManager,
+		payloadFmt: &myPayloadFormatter,
+	}
 }
 
 func (s *service) start() {
