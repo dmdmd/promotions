@@ -13,10 +13,10 @@ type productPayload struct {
 }
 
 type productPricePayload struct {
-	Original           int     `json:"original"`
-	Final              int     `json:"final"`
-	DiscountPercentage *string `json:"discount"`
-	Currency           string  `json:"currency"`
+	Original int     `json:"original"`
+	Final    int     `json:"final"`
+	Discount *string `json:"discount"`
+	Currency string  `json:"currency"`
 }
 
 type formatter interface {
@@ -24,7 +24,7 @@ type formatter interface {
 	getPriceAndDiscount(p product) (int, *string)
 }
 
-type payloadFormatter struct {}
+type payloadFormatter struct{}
 
 func (s *payloadFormatter) formatResponse(ps []product) payload {
 	var products = make([]productPayload, len(ps))
@@ -37,10 +37,10 @@ func (s *payloadFormatter) formatResponse(ps []product) payload {
 			Name:     p.Name,
 			Category: p.Category,
 			Price: productPricePayload{
-				Original:           p.Price,
-				Currency:           "EUR",
-				Final:              finalPrice,
-				DiscountPercentage: discount,
+				Original: p.Price,
+				Currency: "EUR",
+				Final:    finalPrice,
+				Discount: discount,
 			},
 		}
 
