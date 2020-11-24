@@ -37,12 +37,17 @@ func (s *service) start() {
 }
 
 func (s *service) handler(w http.ResponseWriter, r *http.Request) {
-	var filterByCategory, filterByPriceLessThan string
-	if len(r.URL.Query()["category"]) > 0 {
-		filterByCategory = r.URL.Query()["category"][0]
+	var (
+		filterByCategory, filterByPriceLessThan string
+		queryParams                             = r.URL.Query()
+		category                                = queryParams["category"]
+		priceLessThan                           = queryParams["priceLessThan"]
+	)
+	if len(category) > 0 {
+		filterByCategory = category[0]
 	}
-	if len(r.URL.Query()["priceLessThan"]) > 0 {
-		filterByPriceLessThan = r.URL.Query()["priceLessThan"][0]
+	if len(priceLessThan) > 0 {
+		filterByPriceLessThan = priceLessThan[0]
 	}
 
 	dbContent := s.db.queryDB(filterByCategory, filterByPriceLessThan)
